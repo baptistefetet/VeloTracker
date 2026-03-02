@@ -1,0 +1,13 @@
+name: Deploy VeloTracker
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy webhook
+        run: curl -s -X POST https://velo.pbat.ovh/webhook/deploy

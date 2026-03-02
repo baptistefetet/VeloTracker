@@ -31,9 +31,6 @@
         <header class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100 sticky top-2 z-50">
             <div class="flex items-center gap-3">
                 <span class="text-xl font-extrabold tracking-tighter"><span class="text-indigo-600">VÉLO</span>TRACKER</span>
-                <button type="button" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-sm transition-colors">
-                    Démarrer
-                </button>
             </div>
             <div id="status-badge" class="flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 transition-all">
                 <div id="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></div>
@@ -81,7 +78,7 @@
                 </div>
                 
                 <!-- Contrôles Flottants -->
-                <div class="absolute bottom-8 left-0 right-0 flex justify-center px-4">
+                <div class="absolute bottom-8 left-0 right-0 flex justify-center px-4 z-[1000]">
                     <button id="startBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-full font-black shadow-2xl transition-all transform active:scale-95 flex items-center gap-3">
                         <div class="w-3 h-3 rounded-full bg-white animate-pulse"></div>
                         COMMENCER LA BALADE
@@ -143,22 +140,115 @@
     </div>
 
     <script>
+        // === State ===
         let map, polyline, watchId, userMarker, wakeLock = null;
-        let isTracking = false, isPaused = false;
-        let path = [], totalDistance = 0, elevPositive = 0, elevNegative = 0, lastAltitude = null;
+        let isTracking = false;
+        let pathPoints = [], totalDistance = 0, elevPositive = 0, elevNegative = 0, lastAltitude = null;
         let activeSeconds = 0, timerInterval;
         let maxSpeed100m = 0;
-        let positionsBuffer = []; // Pour calculer la vitesse max sur 100m
+        let positionsBuffer = [];
 
+        // Supabase batch state
+        let currentTripId = null;
+        let pointOrder = 0;
+        let pointsBatch = [];
+        let batchInterval = null;
+        const BATCH_FLUSH_MS = 10000;
+
+        // === API helpers ===
+        async function apiPost(url, body) {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            return res.json();
+        }
+
+        async function apiPut(url, body) {
+            const res = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            return res.json();
+        }
+
+        async function apiGet(url) {
+            const res = await fetch(url);
+            return res.json();
+        }
+
+        async function createTrip() {
+            const result = await apiPost('/api/trips', {});
+            if (result.ok) return result.data.id;
+            console.error('createTrip failed:', result.error);
+            return null;
+        }
+
+        function queuePoint(lat, lng, altitude, accuracy) {
+            pointsBatch.push({
+                lat, lng, altitude, accuracy,
+                point_order: pointOrder++,
+                recorded_at: new Date().toISOString()
+            });
+        }
+
+        async function flushPoints() {
+            if (!currentTripId || pointsBatch.length === 0) return;
+            const toSend = [...pointsBatch];
+            try {
+                const result = await apiPost(`/api/trips/${currentTripId}/points`, { points: toSend });
+                if (result.ok) {
+                    // Remove only the points we successfully sent
+                    pointsBatch.splice(0, toSend.length);
+                }
+            } catch (e) {
+                console.error('flushPoints network error, will retry:', e);
+            }
+        }
+
+        async function finalizeTrip() {
+            if (!currentTripId) return;
+            await flushPoints();
+            const distKm = totalDistance / 1000;
+            const avgSpeed = activeSeconds > 0 ? distKm / (activeSeconds / 3600) : 0;
+            await apiPut(`/api/trips/${currentTripId}/finish`, {
+                distance_km: parseFloat(distKm.toFixed(2)),
+                duration_seconds: activeSeconds,
+                avg_speed_kmh: parseFloat(avgSpeed.toFixed(2)),
+                max_speed_kmh: parseFloat(maxSpeed100m.toFixed(2)),
+                elev_positive: Math.round(elevPositive),
+                elev_negative: Math.round(elevNegative)
+            });
+        }
+
+        async function fetchTrips() {
+            try {
+                const result = await apiGet('/api/trips');
+                return result.ok ? result.data : [];
+            } catch (e) {
+                console.error('fetchTrips error:', e);
+                return [];
+            }
+        }
+
+        function formatDuration(seconds) {
+            const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+            const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+            const s = String(seconds % 60).padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        // === Wake Lock ===
         async function getWakeLock() {
             if ('wakeLock' in navigator) {
                 try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
             }
         }
 
-        function toLatLng(point) {
-            return [point.lat, point.lng];
-        }
+        // === Geo helpers ===
+        function toLatLng(point) { return [point.lat, point.lng]; }
 
         function haversineDistanceMeters(a, b) {
             const toRad = deg => deg * (Math.PI / 180);
@@ -167,7 +257,6 @@
             const dLng = toRad(b.lng - a.lng);
             const lat1 = toRad(a.lat);
             const lat2 = toRad(b.lat);
-
             const sinDlat = Math.sin(dLat / 2);
             const sinDlng = Math.sin(dLng / 2);
             const h = sinDlat * sinDlat + Math.cos(lat1) * Math.cos(lat2) * sinDlng * sinDlng;
@@ -183,43 +272,33 @@
             }, null, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
         }
 
+        // === Map ===
         function initMap() {
             try {
                 if (typeof L === 'undefined') return;
                 const mapContainer = document.getElementById("map");
                 mapContainer.innerHTML = "";
-
-                map = L.map(mapContainer, {
-                    zoomControl: true,
-                    attributionControl: true
-                });
+                map = L.map(mapContainer, { zoomControl: true, attributionControl: true });
                 map.setView([48.85, 2.35], 16);
-
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19,
                     attribution: '&copy; OpenStreetMap contributors'
                 }).addTo(map);
-
                 polyline = L.polyline([], { color: "#4F46E5", opacity: 0.8, weight: 6 }).addTo(map);
                 userMarker = L.circleMarker([48.85, 2.35], {
-                    radius: 6,
-                    color: "#FFF",
-                    weight: 2,
-                    fillColor: "#4F46E5",
-                    fillOpacity: 1
+                    radius: 6, color: "#FFF", weight: 2, fillColor: "#4F46E5", fillOpacity: 1
                 }).addTo(map);
                 centerMapOnUser();
             } catch (e) {}
         }
 
+        // === Timer ===
         function updateTimer() {
             activeSeconds++;
-            const h = String(Math.floor(activeSeconds / 3600)).padStart(2, '0');
-            const m = String(Math.floor((activeSeconds % 3600) / 60)).padStart(2, '0');
-            const s = String(activeSeconds % 60).padStart(2, '0');
-            document.getElementById('timerVal').innerText = `${h}:${m}:${s}`;
+            document.getElementById('timerVal').innerText = formatDuration(activeSeconds);
         }
 
+        // === Speed ===
         function calculateMaxSpeed(newPos, now) {
             positionsBuffer.push({ pos: newPos, time: now });
             let dist = 0;
@@ -233,24 +312,36 @@
                 const speed = (dist / 1000) / timeHrs;
                 if (speed > maxSpeed100m) {
                     maxSpeed100m = speed;
-                    document.getElementById('speedMaxVal').innerText = maxSpeed100m.toFixed(1);
+                    document.getElementById('speedMaxVal').innerText = maxSpeed100m.toFixed(2);
                 }
                 positionsBuffer.splice(0, idx);
             }
         }
 
-        function startTracking() {
+        // === Tracking ===
+        async function startTracking() {
+            const tripId = await createTrip();
+            if (!tripId) {
+                alert('Erreur: impossible de créer le trajet. Vérifiez la connexion.');
+                return;
+            }
+            currentTripId = tripId;
+            pointOrder = 0;
+            pointsBatch = [];
+
             isTracking = true;
-            path = []; totalDistance = 0; elevPositive = 0; elevNegative = 0; activeSeconds = 0; maxSpeed100m = 0;
-            positionsBuffer = [];
+            pathPoints = []; totalDistance = 0; elevPositive = 0; elevNegative = 0; activeSeconds = 0; maxSpeed100m = 0;
+            positionsBuffer = []; lastAltitude = null;
             if (polyline) polyline.setLatLngs([]);
+
             document.getElementById('startBtn').classList.add('hidden');
             document.getElementById('stopBtn').classList.remove('hidden');
             document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
             document.getElementById('status-text').innerText = "ENREGISTREMENT";
-            
+
             getWakeLock();
             timerInterval = setInterval(updateTimer, 1000);
+            batchInterval = setInterval(flushPoints, BATCH_FLUSH_MS);
 
             watchId = navigator.geolocation.watchPosition(p => {
                 if (p.coords.accuracy > 40) return;
@@ -259,10 +350,9 @@
 
                 if (userMarker) userMarker.setLatLng(toLatLng(newPos));
 
-                if (path.length > 0) {
-                    const last = path[path.length - 1];
+                if (pathPoints.length > 0) {
+                    const last = pathPoints[pathPoints.length - 1];
                     const d = haversineDistanceMeters(last, newPos);
-                    
                     if (d > 4) {
                         totalDistance += d;
                         calculateMaxSpeed(newPos, now);
@@ -272,14 +362,16 @@
                             else if (diff < -0.6) elevNegative += Math.abs(diff);
                         }
                         lastAltitude = p.coords.altitude;
-                        path.push(newPos);
-                        if (polyline) polyline.setLatLngs(path.map(toLatLng));
+                        pathPoints.push(newPos);
+                        queuePoint(newPos.lat, newPos.lng, p.coords.altitude, p.coords.accuracy);
+                        if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
                         if (map) map.panTo(toLatLng(newPos));
                     }
                 } else {
-                    path.push(newPos);
+                    pathPoints.push(newPos);
                     lastAltitude = p.coords.altitude;
-                    if (polyline) polyline.setLatLngs(path.map(toLatLng));
+                    queuePoint(newPos.lat, newPos.lng, p.coords.altitude, p.coords.accuracy);
+                    if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
                     if (map) map.panTo(toLatLng(newPos));
                 }
 
@@ -287,56 +379,47 @@
                 document.getElementById('elevPos').innerText = Math.round(elevPositive);
                 document.getElementById('elevNeg').innerText = Math.round(elevNegative);
                 const avg = activeSeconds > 0 ? (totalDistance / 1000) / (activeSeconds / 3600) : 0;
-                document.getElementById('speedVal').innerText = avg.toFixed(1);
+                document.getElementById('speedVal').innerText = avg.toFixed(2);
             }, null, { enableHighAccuracy: true });
         }
 
-        function stopTracking() {
+        async function stopTracking() {
             isTracking = false;
             clearInterval(timerInterval);
+            clearInterval(batchInterval);
             navigator.geolocation.clearWatch(watchId);
             if (wakeLock) { wakeLock.release(); wakeLock = null; }
-            
-            saveToHistory();
+
+            await finalizeTrip();
+            currentTripId = null;
+
             document.getElementById('startBtn').classList.remove('hidden');
             document.getElementById('stopBtn').classList.add('hidden');
             document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-slate-400";
             document.getElementById('status-text').innerText = "PRÊT";
+
+            await refreshUI();
         }
 
-        function saveToHistory() {
-            const d = (totalDistance / 1000).toFixed(2);
-            if (parseFloat(d) < 0.05) return;
-            const now = new Date();
-            const session = {
-                id: Date.now(),
-                date: now.toLocaleDateString('fr-FR'),
-                km: d,
-                dur: document.getElementById('timerVal').innerText,
-                max: maxSpeed100m.toFixed(1),
-                up: Math.round(elevPositive),
-                down: Math.round(elevNegative),
-                timestamp: now.getTime()
-            };
-            const h = JSON.parse(localStorage.getItem('bike_final_v1') || '[]');
-            h.unshift(session);
-            localStorage.setItem('bike_final_v1', JSON.stringify(h));
-            refreshUI();
-        }
-
-        function refreshUI() {
-            const h = JSON.parse(localStorage.getItem('bike_final_v1') || '[]');
+        // === UI ===
+        async function refreshUI() {
+            const trips = await fetchTrips();
             const list = document.getElementById('history-content');
-            list.innerHTML = h.length ? '' : '<p class="text-center text-slate-400 text-xs py-10 italic">Aucune balade enregistrée</p>';
-            
+            list.innerHTML = trips.length ? '' : '<p class="text-center text-slate-400 text-xs py-10 italic">Aucune balade enregistrée</p>';
+
             const now = new Date();
             let dayK = 0, dayU = 0, dayD = 0;
             let monthK = 0, monthU = 0, monthD = 0;
             let yearK = 0, yearU = 0, yearD = 0;
 
-            h.forEach(s => {
-                const sDate = new Date(s.timestamp);
-                const k = parseFloat(s.km), u = s.up, d = s.down;
+            trips.forEach(t => {
+                const sDate = new Date(t.started_at);
+                const k = t.distance_km || 0;
+                const u = t.elev_positive || 0;
+                const d = t.elev_negative || 0;
+                const dur = formatDuration(t.duration_seconds || 0);
+                const maxSpd = t.max_speed_kmh || 0;
+                const dateStr = sDate.toLocaleDateString('fr-FR');
 
                 if (sDate.toDateString() === now.toDateString()) { dayK += k; dayU += u; dayD += d; }
                 if (sDate.getMonth() === now.getMonth() && sDate.getFullYear() === now.getFullYear()) { monthK += k; monthU += u; monthD += d; }
@@ -346,23 +429,23 @@
                 div.className = "bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center";
                 div.innerHTML = `
                     <div class="text-[10px]">
-                        <p class="font-black text-slate-900">${s.date}</p>
-                        <p class="text-slate-400">${s.dur} • Max ${s.max} km/h</p>
+                        <p class="font-black text-slate-900">${dateStr}</p>
+                        <p class="text-slate-400">${dur} • Max ${maxSpd.toFixed(2)} km/h</p>
                     </div>
                     <div class="text-right">
-                        <p class="text-indigo-600 font-black">${s.km} km</p>
-                        <p class="text-[9px] text-slate-400 font-bold">▲${s.up}m ▼${s.down}m</p>
+                        <p class="text-indigo-600 font-black">${k.toFixed(2)} km</p>
+                        <p class="text-[9px] text-slate-400 font-bold">▲${u}m ▼${d}m</p>
                     </div>`;
                 list.appendChild(div);
             });
 
-            document.getElementById('stats-day').innerText = dayK.toFixed(1) + " km";
+            document.getElementById('stats-day').innerText = dayK.toFixed(2) + " km";
             document.getElementById('stats-day-pos').innerText = "+" + dayU + "m";
             document.getElementById('stats-day-neg').innerText = "-" + dayD + "m";
-            document.getElementById('stats-month').innerText = monthK.toFixed(1) + " km";
+            document.getElementById('stats-month').innerText = monthK.toFixed(2) + " km";
             document.getElementById('stats-month-pos').innerText = "+" + monthU + "m";
             document.getElementById('stats-month-neg').innerText = "-" + monthD + "m";
-            document.getElementById('stats-year').innerText = yearK.toFixed(1) + " km";
+            document.getElementById('stats-year').innerText = yearK.toFixed(2) + " km";
             document.getElementById('stats-year-pos').innerText = "+" + yearU + "m";
             document.getElementById('stats-year-neg').innerText = "-" + yearD + "m";
             document.getElementById('year-label').innerText = now.getFullYear();
@@ -378,7 +461,7 @@
 
         document.getElementById('startBtn').onclick = startTracking;
         document.getElementById('stopBtn').onclick = stopTracking;
-        window.onload = () => { initMap(); refreshUI(); };
+        window.onload = async () => { initMap(); await refreshUI(); };
     </script>
 </body>
 </html>

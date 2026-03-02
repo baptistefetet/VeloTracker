@@ -148,6 +148,10 @@
         let maxSpeed100m = 0;
         let positionsBuffer = [];
 
+        let isMoving = false;
+        let lastGpsTime = null;
+        const MIN_SPEED_KMH = 3; // Seuil auto-pause (en dessous = arrêté/à pied)
+
         // Supabase batch state
         let currentTripId = null;
         let pointOrder = 0;
@@ -294,7 +298,7 @@
 
         // === Timer ===
         function updateTimer() {
-            activeSeconds++;
+            if (isMoving) activeSeconds++;
             document.getElementById('timerVal').innerText = formatDuration(activeSeconds);
         }
 
@@ -329,7 +333,7 @@
             pointOrder = 0;
             pointsBatch = [];
 
-            isTracking = true;
+            isTracking = true; isMoving = false; lastGpsTime = null;
             pathPoints = []; totalDistance = 0; elevPositive = 0; elevNegative = 0; activeSeconds = 0; maxSpeed100m = 0;
             positionsBuffer = []; lastAltitude = null;
             if (polyline) polyline.setLatLngs([]);
@@ -350,9 +354,25 @@
 
                 if (userMarker) userMarker.setLatLng(toLatLng(newPos));
 
-                if (pathPoints.length > 0) {
+                // Calcul vitesse instantanée pour auto-pause
+                if (lastGpsTime !== null && pathPoints.length > 0) {
                     const last = pathPoints[pathPoints.length - 1];
                     const d = haversineDistanceMeters(last, newPos);
+                    const dtHrs = (now - lastGpsTime) / 3600000;
+                    const instantSpeed = dtHrs > 0 ? (d / 1000) / dtHrs : 0;
+                    const wasMoving = isMoving;
+                    isMoving = instantSpeed >= MIN_SPEED_KMH;
+
+                    if (isMoving !== wasMoving) {
+                        if (isMoving) {
+                            document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+                            document.getElementById('status-text').innerText = "ENREGISTREMENT";
+                        } else {
+                            document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-amber-400";
+                            document.getElementById('status-text').innerText = "EN PAUSE";
+                        }
+                    }
+
                     if (d > 4) {
                         totalDistance += d;
                         calculateMaxSpeed(newPos, now);
@@ -374,6 +394,7 @@
                     if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
                     if (map) map.panTo(toLatLng(newPos));
                 }
+                lastGpsTime = now;
 
                 document.getElementById('distVal').innerText = (totalDistance / 1000).toFixed(2);
                 document.getElementById('elevPos').innerText = Math.round(elevPositive);

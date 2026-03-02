@@ -1,0 +1,12 @@
+{
+  "name": "velotracker",
+  "version": "1.0.0",
+  "description": "VéloTracker - Planifier et suivre des sorties vélo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

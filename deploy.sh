@@ -7,4 +7,4 @@ set -e
 git fetch origin master
 git reset --hard origin/master
 npm install --production --silent
-touch /tmp/velotracker-deploy-trigger
+touch /run/deploy-triggers/velotracker

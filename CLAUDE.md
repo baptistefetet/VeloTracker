@@ -82,7 +82,7 @@ journalctl -u velotracker -f
 ## Déploiement
 Le service tourne en tant que `www-data` via systemd (`velotracker.service`).
 
-Webhook `/webhook/deploy` déclenche `deploy.sh` (git pull + npm install + restart).
+Webhook `/webhook/deploy` déclenche `deploy.sh` (git pull + npm install + touch trigger). Le redémarrage est géré par un systemd path unit (`velotracker-deploy.path`).
 
 Déploiement manuel :
 ```bash

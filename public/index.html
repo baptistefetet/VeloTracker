@@ -207,6 +207,9 @@
         let activeSeconds = 0, timerInterval;
         let maxSpeed100m = 0;
         let positionsBuffer = [];
+        let altitudeBuffer = [];
+        const ALT_SMOOTH_SIZE = 5; // Nombre de points pour la moyenne mobile
+        const MIN_ELEV_DIFF = 1.5; // Seuil minimum (mètres) pour compter du dénivelé
 
         let isMoving = false;
         let lastGpsTime = null;
@@ -395,7 +398,7 @@
 
             isTracking = true; isMoving = false; lastGpsTime = null;
             pathPoints = []; totalDistance = 0; elevPositive = 0; elevNegative = 0; activeSeconds = 0; maxSpeed100m = 0;
-            positionsBuffer = []; lastAltitude = null;
+            positionsBuffer = []; altitudeBuffer = []; lastAltitude = null;
             if (polyline) polyline.setLatLngs([]);
 
             const btn = document.getElementById('trackBtn');
@@ -436,14 +439,27 @@
                     }
 
                     if (d > 4) {
-                        totalDistance += d;
-                        calculateMaxSpeed(newPos, now);
-                        if (p.coords.altitude !== null && lastAltitude !== null) {
-                            let diff = p.coords.altitude - lastAltitude;
-                            if (diff > 0.6) elevPositive += diff;
-                            else if (diff < -0.6) elevNegative += Math.abs(diff);
+                        const now = p.timestamp || Date.now();
+                        
+                        if (p.coords.altitude !== null) {
+                            altitudeBuffer.push(p.coords.altitude);
+                            if (altitudeBuffer.length > ALT_SMOOTH_SIZE) altitudeBuffer.shift();
+                            
+                            const avgAlt = altitudeBuffer.reduce((a, b) => a + b, 0) / altitudeBuffer.length;
+                            
+                            if (lastAltitude !== null) {
+                                let diff = avgAlt - lastAltitude;
+                                if (Math.abs(diff) >= MIN_ELEV_DIFF) {
+                                    if (diff > 0) elevPositive += diff;
+                                    else elevNegative += Math.abs(diff);
+                                    lastAltitude = avgAlt; // On ne change la référence que si le seuil est franchi
+                                }
+                            } else {
+                                lastAltitude = avgAlt;
+                            }
                         }
-                        lastAltitude = p.coords.altitude;
+
+                        totalDistance += d;
                         pathPoints.push(newPos);
                         queuePoint(newPos.lat, newPos.lng, p.coords.altitude, p.coords.accuracy);
                         if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
@@ -451,7 +467,10 @@
                     }
                 } else {
                     pathPoints.push(newPos);
-                    lastAltitude = p.coords.altitude;
+                    if (p.coords.altitude !== null) {
+                        altitudeBuffer = [p.coords.altitude];
+                        lastAltitude = p.coords.altitude;
+                    }
                     queuePoint(newPos.lat, newPos.lng, p.coords.altitude, p.coords.accuracy);
                     if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
                     if (map) map.panTo(toLatLng(newPos));

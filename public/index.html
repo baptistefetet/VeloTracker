@@ -17,11 +17,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
     <style>
+        html,
+        body {
+            overscroll-behavior-y: none;
+        }
+
         body {
             font-family: 'Outfit', sans-serif;
             background-color: #F8FAFC;
             -webkit-font-smoothing: antialiased;
-            overscroll-behavior-y: none;
         }
 
         #map {
@@ -366,7 +370,7 @@
 
         // === Timer ===
         function updateTimer() {
-            if (isMoving) activeSeconds++;
+            activeSeconds++;
             document.getElementById('timerVal').innerText = formatDuration(activeSeconds);
         }
 

@@ -1,44 +1,100 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#4F46E5">
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png?v=2">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
     <title>VéloTracker Pro - Version Stable</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <style>
-        body { font-family: 'Outfit', sans-serif; background-color: #F8FAFC; -webkit-font-smoothing: antialiased; }
-        #map { height: 100%; width: 100%; border-radius: 1.5rem; background-color: #CBD5E1; }
-        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.6); box-shadow: 0 4px 20px -5px rgba(0,0,0,0.05); }
-        .tab-active { color: #4F46E5; border-bottom: 3px solid #4F46E5; }
-        .recording-pulse { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4); }
-            70% { box-shadow: 0 0 0 12px rgba(225, 29, 72, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #F8FAFC;
+            -webkit-font-smoothing: antialiased;
         }
-        .history-scroll::-webkit-scrollbar { width: 4px; }
-        .history-scroll::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
-        .leaflet-container { font-family: 'Outfit', sans-serif; }
+
+        #map {
+            height: 100%;
+            width: 100%;
+            border-radius: 1.5rem;
+            background-color: #CBD5E1;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
+        }
+
+        .tab-active {
+            color: #4F46E5;
+            border-bottom: 3px solid #4F46E5;
+        }
+
+        .recording-pulse {
+            animation: pulse-red 2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% {
+                box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 12px rgba(225, 29, 72, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(225, 29, 72, 0);
+            }
+        }
+
+        .history-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .history-scroll::-webkit-scrollbar-thumb {
+            background: #E2E8F0;
+            border-radius: 10px;
+        }
+
+        .leaflet-container {
+            font-family: 'Outfit', sans-serif;
+        }
     </style>
 </head>
+
 <body class="text-slate-800 p-2 md:p-6 min-h-screen">
 
     <div class="max-w-7xl mx-auto space-y-4">
         <!-- Barre de Statut Supérieure -->
-        <header class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100 sticky top-2 z-50">
+        <header
+            class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100 sticky top-2 z-50">
             <div class="flex items-center gap-3">
-                <span class="text-xl font-extrabold tracking-tighter"><span class="text-indigo-600">VÉLO</span>TRACKER</span>
+                <span class="text-xl font-extrabold tracking-tighter"><span
+                        class="text-indigo-600">VÉLO</span>TRACKER</span>
+                <button id="startBtn"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+                    COMMENCER LA BALADE
+                </button>
             </div>
-            <div id="status-badge" class="flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 transition-all">
+            <div id="status-badge"
+                class="flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 transition-all">
                 <div id="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></div>
-                <span id="status-text" class="text-[10px] font-black uppercase tracking-widest text-slate-500">PRÊT</span>
+                <span id="status-text"
+                    class="text-[10px] font-black uppercase tracking-widest text-slate-500">PRÊT</span>
             </div>
         </header>
 
@@ -46,7 +102,8 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-indigo-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Distance</p>
-                <p class="text-2xl font-black"><span id="distVal">0.00</span><span class="text-[10px] ml-1">km</span></p>
+                <p class="text-2xl font-black"><span id="distVal">0.00</span><span class="text-[10px] ml-1">km</span>
+                </p>
             </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-blue-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Durée</p>
@@ -54,40 +111,44 @@
             </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-amber-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Moyenne</p>
-                <p class="text-2xl font-black"><span id="speedVal">0.0</span><span class="text-[10px] ml-1">km/h</span></p>
+                <p class="text-2xl font-black"><span id="speedVal">0.0</span><span class="text-[10px] ml-1">km/h</span>
+                </p>
             </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-orange-600 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Vit. Max (100m)</p>
-                <p class="text-2xl font-black text-orange-600"><span id="speedMaxVal">0.0</span><span class="text-[10px] ml-1">km/h</span></p>
+                <p class="text-2xl font-black text-orange-600"><span id="speedMaxVal">0.0</span><span
+                        class="text-[10px] ml-1">km/h</span></p>
             </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-emerald-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Déniv. (+)</p>
-                <p class="text-2xl font-black text-emerald-600">+<span id="elevPos">0</span><span class="text-[10px] ml-1">m</span></p>
+                <p class="text-2xl font-black text-emerald-600">+<span id="elevPos">0</span><span
+                        class="text-[10px] ml-1">m</span></p>
             </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-rose-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Déniv. (-)</p>
-                <p class="text-2xl font-black text-rose-600">-<span id="elevNeg">0</span><span class="text-[10px] ml-1">m</span></p>
+                <p class="text-2xl font-black text-rose-600">-<span id="elevNeg">0</span><span
+                        class="text-[10px] ml-1">m</span></p>
             </div>
         </div>
 
         <!-- Contenu Principal -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <!-- Carte -->
-            <div class="lg:col-span-8 h-[450px] md:h-[650px] relative glass-card rounded-3xl overflow-hidden shadow-xl border-2 border-white">
+            <div
+                class="lg:col-span-8 h-[450px] md:h-[650px] relative glass-card rounded-3xl overflow-hidden shadow-xl border-2 border-white">
                 <div id="map">
-                    <div class="h-full w-full flex flex-col items-center justify-center p-12 text-center text-slate-400 bg-slate-50">
+                    <div
+                        class="h-full w-full flex flex-col items-center justify-center p-12 text-center text-slate-400 bg-slate-50">
                         <p class="text-lg font-bold">CARTE NON CHARGÉE</p>
-                        <p class="text-xs mt-2">La carte OpenStreetMap se chargera automatiquement dès l'ouverture de la page.</p>
+                        <p class="text-xs mt-2">La carte OpenStreetMap se chargera automatiquement dès l'ouverture de la
+                            page.</p>
                     </div>
                 </div>
-                
+
                 <!-- Contrôles Flottants -->
                 <div class="absolute bottom-8 left-0 right-0 flex justify-center px-4 z-[1000]">
-                    <button id="startBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-10 py-4 rounded-full font-black shadow-2xl transition-all transform active:scale-95 flex items-center gap-3">
-                        <div class="w-3 h-3 rounded-full bg-white animate-pulse"></div>
-                        COMMENCER LA BALADE
-                    </button>
-                    <button id="stopBtn" class="hidden bg-rose-600 hover:bg-rose-700 text-white px-10 py-4 rounded-full font-black shadow-2xl transition-all transform active:scale-95 flex items-center gap-3 recording-pulse">
+                    <button id="stopBtn"
+                        class="hidden bg-rose-600 hover:bg-rose-700 text-white px-10 py-4 rounded-full font-black shadow-2xl transition-all transform active:scale-95 flex items-center gap-3 recording-pulse">
                         <div class="w-3 h-3 bg-white rounded-sm"></div>
                         ARRÊTER L'ENREGISTREMENT
                     </button>
@@ -98,8 +159,10 @@
             <div class="lg:col-span-4 flex flex-col gap-4">
                 <div class="glass-card rounded-3xl p-5 flex-grow flex flex-col min-h-[400px]">
                     <div class="flex border-b border-slate-100 mb-6">
-                        <button onclick="switchTab('history')" id="tab-history" class="flex-1 pb-4 text-[11px] font-black uppercase tracking-widest tab-active">Détails</button>
-                        <button onclick="switchTab('reports')" id="tab-reports" class="flex-1 pb-4 text-[11px] font-black uppercase tracking-widest text-slate-400">Rapports</button>
+                        <button onclick="switchTab('history')" id="tab-history"
+                            class="flex-1 pb-4 text-[11px] font-black uppercase tracking-widest tab-active">Détails</button>
+                        <button onclick="switchTab('reports')" id="tab-reports"
+                            class="flex-1 pb-4 text-[11px] font-black uppercase tracking-widest text-slate-400">Rapports</button>
                     </div>
 
                     <div id="history-content" class="flex-grow overflow-y-auto history-scroll space-y-3">
@@ -128,7 +191,8 @@
                             </div>
                         </div>
                         <div class="bg-slate-900 p-4 rounded-2xl">
-                            <p class="text-[10px] font-black text-slate-500 uppercase mb-3">Année <span id="year-label">2024</span></p>
+                            <p class="text-[10px] font-black text-slate-500 uppercase mb-3">Année <span
+                                    id="year-label">2024</span></p>
                             <div class="flex justify-between items-end">
                                 <span class="text-2xl font-black text-white" id="stats-year">0.0 km</span>
                                 <div class="text-right text-[10px] font-bold">
@@ -251,7 +315,7 @@
         // === Wake Lock ===
         async function getWakeLock() {
             if ('wakeLock' in navigator) {
-                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+                try { wakeLock = await navigator.wakeLock.request('screen'); } catch (e) { }
             }
         }
 
@@ -297,7 +361,7 @@
                     radius: 6, color: "#FFF", weight: 2, fillColor: "#4F46E5", fillOpacity: 1
                 }).addTo(map);
                 centerMapOnUser();
-            } catch (e) {}
+            } catch (e) { }
         }
 
         // === Timer ===
@@ -499,4 +563,5 @@
         }
     </script>
 </body>
+
 </html>

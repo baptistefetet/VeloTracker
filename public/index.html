@@ -118,14 +118,14 @@
                 <p class="text-2xl font-black text-orange-600"><span id="speedMaxVal">0.0</span><span
                         class="text-[10px] ml-1">km/h</span></p>
             </div>
-            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-emerald-500 text-center">
+            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-rose-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Déniv. (+)</p>
-                <p class="text-2xl font-black text-emerald-600">+<span id="elevPos">0</span><span
+                <p class="text-2xl font-black text-rose-600">+<span id="elevPos">0</span><span
                         class="text-[10px] ml-1">m</span></p>
             </div>
-            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-rose-500 text-center">
+            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-emerald-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Déniv. (-)</p>
-                <p class="text-2xl font-black text-rose-600">-<span id="elevNeg">0</span><span
+                <p class="text-2xl font-black text-emerald-600">-<span id="elevNeg">0</span><span
                         class="text-[10px] ml-1">m</span></p>
             </div>
         </div>
@@ -167,8 +167,8 @@
                             <div class="flex justify-between items-end">
                                 <span class="text-2xl font-black text-slate-800" id="stats-day">0.0 km</span>
                                 <div class="text-right text-[10px] font-bold">
-                                    <p class="text-emerald-600" id="stats-day-pos">+0m</p>
-                                    <p class="text-rose-600" id="stats-day-neg">-0m</p>
+                                    <p class="text-rose-600" id="stats-day-pos">+0m</p>
+                                    <p class="text-emerald-600" id="stats-day-neg">-0m</p>
                                 </div>
                             </div>
                         </div>
@@ -188,8 +188,8 @@
                             <div class="flex justify-between items-end">
                                 <span class="text-2xl font-black text-white" id="stats-year">0.0 km</span>
                                 <div class="text-right text-[10px] font-bold">
-                                    <p class="text-emerald-400" id="stats-year-pos">+0m</p>
-                                    <p class="text-rose-400" id="stats-year-neg">-0m</p>
+                                    <p class="text-rose-400" id="stats-year-pos">+0m</p>
+                                    <p class="text-emerald-400" id="stats-year-neg">-0m</p>
                                 </div>
                             </div>
                         </div>
@@ -440,13 +440,13 @@
 
                     if (d > 4) {
                         const now = p.timestamp || Date.now();
-                        
+
                         if (p.coords.altitude !== null) {
                             altitudeBuffer.push(p.coords.altitude);
                             if (altitudeBuffer.length > ALT_SMOOTH_SIZE) altitudeBuffer.shift();
-                            
+
                             const avgAlt = altitudeBuffer.reduce((a, b) => a + b, 0) / altitudeBuffer.length;
-                            
+
                             if (lastAltitude !== null) {
                                 let diff = avgAlt - lastAltitude;
                                 if (Math.abs(diff) >= MIN_ELEV_DIFF) {

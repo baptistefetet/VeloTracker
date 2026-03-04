@@ -1,11 +1,12 @@
-const CACHE_NAME = 'velotracker-v2';
+const CACHE_NAME = 'velotracker-v3';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
     '/manifest.json',
     '/favicon.png',
     '/icon-192.png',
-    '/icon-512.png'
+    '/icon-512.png',
+    '/silence.mp3'
 ];
 
 self.addEventListener('install', (event) => {

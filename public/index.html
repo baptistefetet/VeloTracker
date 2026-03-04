@@ -202,6 +202,7 @@
     <script>
         // === State ===
         let map, polyline, watchId, userMarker, wakeLock = null;
+        let bgAudio = null;
         let isTracking = false;
         let pathPoints = [], totalDistance = 0, elevPositive = 0, elevNegative = 0, lastAltitude = null;
         let activeSeconds = 0, timerInterval;
@@ -409,6 +410,25 @@
             document.getElementById('status-text').innerText = "ENREGISTREMENT";
 
             getWakeLock();
+
+            // Activation du Silent Audio Hack
+            if (!bgAudio) {
+                bgAudio = new Audio('/silence.mp3');
+                bgAudio.loop = true;
+            }
+            bgAudio.play().catch(e => console.error("Audio playback failed:", e));
+
+            // MediaSession API pour renforcer le mode arrière-plan sur Android
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: 'VéloTracker - GPS Actif',
+                    artist: 'Enregistrement en cours...',
+                    album: 'VeloTracker Pro',
+                    artwork: [{ src: '/favicon.png', sizes: '512x512', type: 'image/png' }]
+                });
+                navigator.mediaSession.playbackState = 'playing';
+            }
+
             timerInterval = setInterval(updateTimer, 1000);
             batchInterval = setInterval(flushPoints, BATCH_FLUSH_MS);
 
@@ -491,6 +511,15 @@
             clearInterval(batchInterval);
             navigator.geolocation.clearWatch(watchId);
             if (wakeLock) { wakeLock.release(); wakeLock = null; }
+
+            // Arrêt du Silent Audio Hack
+            if (bgAudio) {
+                bgAudio.pause();
+                bgAudio.currentTime = 0;
+            }
+            if ('mediaSession' in navigator) {
+                navigator.mediaSession.playbackState = 'none';
+            }
 
             await finalizeTrip();
             currentTripId = null;

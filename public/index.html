@@ -21,6 +21,7 @@
             font-family: 'Outfit', sans-serif;
             background-color: #F8FAFC;
             -webkit-font-smoothing: antialiased;
+            overscroll-behavior-y: none;
         }
 
         #map {
@@ -82,11 +83,12 @@
         <header
             class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100 sticky top-2 z-50">
             <div class="flex items-center gap-3">
-                <img src="/favicon.png" alt="VéloTracker" class="w-11 h-11 rounded-lg shadow-sm">
+                <img src="/favicon.png" alt="VéloTracker" class="w-11 h-11 rounded-lg shadow-sm cursor-pointer"
+                    onclick="window.location.reload()">
                 <button id="trackBtn"
                     class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2">
                     <div id="trackBtnDot" class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
-                    <span id="trackBtnText">COMMENCER LA BALADE</span>
+                    <span id="trackBtnText">COMMENCER</span>
                 </button>
             </div>
             <div id="status-badge"
@@ -536,7 +538,7 @@
             const btn = document.getElementById('trackBtn');
             btn.className = 'bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2';
             document.getElementById('trackBtnDot').className = 'w-2 h-2 rounded-full bg-white animate-pulse';
-            document.getElementById('trackBtnText').innerText = "COMMENCER LA BALADE";
+            document.getElementById('trackBtnText').innerText = "COMMENCER";
             document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-slate-400";
             document.getElementById('status-text').innerText = "PRÊT";
 

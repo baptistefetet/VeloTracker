@@ -370,7 +370,7 @@
 
         // === Timer ===
         function updateTimer() {
-            activeSeconds++;
+            if (isMoving) activeSeconds++;
             document.getElementById('timerVal').innerText = formatDuration(activeSeconds);
         }
 

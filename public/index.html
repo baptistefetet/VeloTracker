@@ -209,7 +209,9 @@
         let maxSpeed100m = 0;
         let positionsBuffer = [];
         let altitudeBuffer = [];
+        let speedBuffer = [];
         const ALT_SMOOTH_SIZE = 5; // Nombre de points pour la moyenne mobile
+        const SPEED_SMOOTH_SIZE = 5; // Nombre de points pour lisser la vitesse
         const MIN_ELEV_DIFF = 1.5; // Seuil minimum (mètres) pour compter du dénivelé
 
         let isMoving = false;
@@ -399,7 +401,7 @@
 
             isTracking = true; isMoving = false; lastGpsTime = null;
             pathPoints = []; totalDistance = 0; elevPositive = 0; elevNegative = 0; activeSeconds = 0; maxSpeed100m = 0;
-            positionsBuffer = []; altitudeBuffer = []; lastAltitude = null;
+            positionsBuffer = []; altitudeBuffer = []; speedBuffer = []; lastAltitude = null;
             if (polyline) polyline.setLatLngs([]);
 
             const btn = document.getElementById('trackBtn');
@@ -445,8 +447,14 @@
                     const d = haversineDistanceMeters(last, newPos);
                     const dtHrs = (now - lastGpsTime) / 3600000;
                     const instantSpeed = dtHrs > 0 ? (d / 1000) / dtHrs : 0;
+
+                    // Lissage de la vitesse pour éviter les auto-pauses/reprises intempestives
+                    speedBuffer.push(instantSpeed);
+                    if (speedBuffer.length > SPEED_SMOOTH_SIZE) speedBuffer.shift();
+                    const smoothedSpeed = speedBuffer.reduce((a, b) => a + b, 0) / speedBuffer.length;
+
                     const wasMoving = isMoving;
-                    isMoving = instantSpeed >= MIN_SPEED_KMH;
+                    isMoving = smoothedSpeed >= MIN_SPEED_KMH;
 
                     if (isMoving !== wasMoving) {
                         if (isMoving) {
@@ -458,7 +466,7 @@
                         }
                     }
 
-                    if (d > 4) {
+                    if (isMoving && d > 4) {
                         const now = p.timestamp || Date.now();
 
                         if (p.coords.altitude !== null) {
@@ -480,6 +488,7 @@
                         }
 
                         totalDistance += d;
+                        calculateMaxSpeed(newPos, now);
                         pathPoints.push(newPos);
                         queuePoint(newPos.lat, newPos.lng, p.coords.altitude, p.coords.accuracy);
                         if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));

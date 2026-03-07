@@ -158,7 +158,7 @@
                 <div class="glass-card rounded-3xl p-5 flex-grow flex flex-col min-h-[400px]">
                     <div class="flex border-b border-slate-100 mb-6">
                         <button onclick="switchTab('history')" id="tab-history"
-                            class="flex-1 pb-4 text-[11px] font-black uppercase tracking-widest tab-active">Détails</button>
+                            class="flex-1 pb-4 text-[11px] font-black uppercase tracking-widest tab-active">Historique</button>
                         <button onclick="switchTab('reports')" id="tab-reports"
                             class="flex-1 pb-4 text-[11px] font-black uppercase tracking-widest text-slate-400">Rapports</button>
                     </div>
@@ -222,7 +222,8 @@
 
         let isMoving = false;
         let lastGpsTime = null;
-        const MIN_SPEED_KMH = 3; // Seuil auto-pause (en dessous = arrêté/à pied)
+        let lastRawPos = null;
+        const MIN_SPEED_KMH = 1; // Seuil auto-pause (en dessous = arrêté/à pied)
 
         // Supabase batch state
         let currentTripId = null;
@@ -288,10 +289,11 @@
             if (!currentTripId) return;
             await flushPoints();
             const distKm = totalDistance / 1000;
-            const avgSpeed = activeSeconds > 0 ? distKm / (activeSeconds / 3600) : 0;
+            const finalSeconds = Math.floor(activeSeconds);
+            const avgSpeed = finalSeconds > 0 ? distKm / (finalSeconds / 3600) : 0;
             await apiPut(`/api/trips/${currentTripId}/finish`, {
                 distance_km: parseFloat(distKm.toFixed(2)),
-                duration_seconds: activeSeconds,
+                duration_seconds: finalSeconds,
                 avg_speed_kmh: parseFloat(avgSpeed.toFixed(2)),
                 max_speed_kmh: parseFloat(maxSpeed100m.toFixed(2)),
                 elev_positive: Math.round(elevPositive),
@@ -310,6 +312,7 @@
         }
 
         function formatDuration(seconds) {
+            seconds = Math.floor(seconds);
             const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
             const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
             const s = String(seconds % 60).padStart(2, '0');
@@ -370,8 +373,11 @@
 
         // === Timer ===
         function updateTimer() {
-            if (isMoving) activeSeconds++;
-            document.getElementById('timerVal').innerText = formatDuration(activeSeconds);
+            let displaySeconds = activeSeconds;
+            if (isTracking && isMoving && lastGpsTime !== null) {
+                displaySeconds += (Date.now() - lastGpsTime) / 1000;
+            }
+            document.getElementById('timerVal').innerText = formatDuration(displaySeconds);
         }
 
         // === Speed ===
@@ -405,7 +411,7 @@
             pointOrder = 0;
             pointsBatch = [];
 
-            isTracking = true; isMoving = false; lastGpsTime = null;
+            isTracking = true; isMoving = false; lastGpsTime = null; lastRawPos = null;
             pathPoints = []; totalDistance = 0; elevPositive = 0; elevNegative = 0; activeSeconds = 0; maxSpeed100m = 0;
             positionsBuffer = []; altitudeBuffer = []; speedBuffer = []; lastAltitude = null;
             if (polyline) polyline.setLatLngs([]);
@@ -447,17 +453,23 @@
 
                 if (userMarker) userMarker.setLatLng(toLatLng(newPos));
 
-                // Calcul vitesse instantanée pour auto-pause
-                if (lastGpsTime !== null && pathPoints.length > 0) {
-                    const last = pathPoints[pathPoints.length - 1];
-                    const d = haversineDistanceMeters(last, newPos);
+                // Calcul vitesse et déplacement
+                if (lastGpsTime !== null && lastRawPos !== null) {
+                    const dRaw = haversineDistanceMeters(lastRawPos, newPos);
                     const dtHrs = (now - lastGpsTime) / 3600000;
-                    const instantSpeed = dtHrs > 0 ? (d / 1000) / dtHrs : 0;
+                    const instantSpeed = dtHrs > 0 ? (dRaw / 1000) / dtHrs : 0;
 
-                    // Lissage de la vitesse pour éviter les auto-pauses/reprises intempestives
-                    speedBuffer.push(instantSpeed);
-                    if (speedBuffer.length > SPEED_SMOOTH_SIZE) speedBuffer.shift();
-                    const smoothedSpeed = speedBuffer.reduce((a, b) => a + b, 0) / speedBuffer.length;
+                    // Lissage de la vitesse
+                    // Si un long délai s'est écoulé (ex: écran éteint), on coupe le lissage pour ne pas être influencé par le passé
+                    let smoothedSpeed;
+                    if (now - lastGpsTime > 10000) {
+                        smoothedSpeed = instantSpeed;
+                        speedBuffer = [instantSpeed];
+                    } else {
+                        speedBuffer.push(instantSpeed);
+                        if (speedBuffer.length > SPEED_SMOOTH_SIZE) speedBuffer.shift();
+                        smoothedSpeed = speedBuffer.reduce((a, b) => a + b, 0) / speedBuffer.length;
+                    }
 
                     const wasMoving = isMoving;
                     isMoving = smoothedSpeed >= MIN_SPEED_KMH;
@@ -472,33 +484,39 @@
                         }
                     }
 
-                    if (isMoving && d > 4) {
-                        const now = p.timestamp || Date.now();
+                    if (isMoving) {
+                        // Temps actif comptabilisé précisément entre les points GPS (fonctionne même écran éteint)
+                        activeSeconds += (now - lastGpsTime) / 1000;
 
-                        if (p.coords.altitude !== null) {
-                            altitudeBuffer.push(p.coords.altitude);
-                            if (altitudeBuffer.length > ALT_SMOOTH_SIZE) altitudeBuffer.shift();
+                        const lastPushed = pathPoints.length > 0 ? pathPoints[pathPoints.length - 1] : null;
+                        const dPath = lastPushed ? haversineDistanceMeters(lastPushed, newPos) : 0;
 
-                            const avgAlt = altitudeBuffer.reduce((a, b) => a + b, 0) / altitudeBuffer.length;
+                        if (!lastPushed || dPath > 4) {
+                            if (p.coords.altitude !== null) {
+                                altitudeBuffer.push(p.coords.altitude);
+                                if (altitudeBuffer.length > ALT_SMOOTH_SIZE) altitudeBuffer.shift();
 
-                            if (lastAltitude !== null) {
-                                let diff = avgAlt - lastAltitude;
-                                if (Math.abs(diff) >= MIN_ELEV_DIFF) {
-                                    if (diff > 0) elevPositive += diff;
-                                    else elevNegative += Math.abs(diff);
-                                    lastAltitude = avgAlt; // On ne change la référence que si le seuil est franchi
+                                const avgAlt = altitudeBuffer.reduce((a, b) => a + b, 0) / altitudeBuffer.length;
+
+                                if (lastAltitude !== null) {
+                                    let diff = avgAlt - lastAltitude;
+                                    if (Math.abs(diff) >= MIN_ELEV_DIFF) {
+                                        if (diff > 0) elevPositive += diff;
+                                        else elevNegative += Math.abs(diff);
+                                        lastAltitude = avgAlt; // On ne change la référence que si le seuil est franchi
+                                    }
+                                } else {
+                                    lastAltitude = avgAlt;
                                 }
-                            } else {
-                                lastAltitude = avgAlt;
                             }
-                        }
 
-                        totalDistance += d;
-                        calculateMaxSpeed(newPos, now);
-                        pathPoints.push(newPos);
-                        queuePoint(newPos.lat, newPos.lng, p.coords.altitude, p.coords.accuracy);
-                        if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
-                        if (map) map.panTo(toLatLng(newPos));
+                            if (lastPushed) totalDistance += dPath;
+                            calculateMaxSpeed(newPos, now);
+                            pathPoints.push(newPos);
+                            queuePoint(newPos.lat, newPos.lng, p.coords.altitude, p.coords.accuracy);
+                            if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
+                            if (map) map.panTo(toLatLng(newPos));
+                        }
                     }
                 } else {
                     pathPoints.push(newPos);
@@ -510,7 +528,9 @@
                     if (polyline) polyline.setLatLngs(pathPoints.map(toLatLng));
                     if (map) map.panTo(toLatLng(newPos));
                 }
+
                 lastGpsTime = now;
+                lastRawPos = newPos;
 
                 document.getElementById('distVal').innerText = (totalDistance / 1000).toFixed(2);
                 document.getElementById('elevPos').innerText = Math.round(elevPositive);

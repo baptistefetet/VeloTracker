@@ -104,7 +104,7 @@
         </header>
 
         <!-- Grille de Statistiques en temps réel -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2">
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-indigo-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Distance</p>
                 <p class="text-2xl font-black"><span id="distVal">0.00</span><span class="text-[10px] ml-1">km</span>
@@ -114,9 +114,15 @@
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Durée</p>
                 <p id="timerVal" class="text-xl font-black">00:00:00</p>
             </div>
+            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-fuchsia-500 text-center">
+                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Vit. actuelle</p>
+                <p class="text-2xl font-black text-fuchsia-600"><span id="speedCurrentVal">0.0</span><span
+                        class="text-[10px] ml-1">km/h</span></p>
+            </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-amber-500 text-center">
-                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Moyenne</p>
-                <p class="text-2xl font-black"><span id="speedVal">0.0</span><span class="text-[10px] ml-1">km/h</span>
+                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Vit. moyenne</p>
+                <p class="text-2xl font-black text-amber-500"><span id="speedVal">0.0</span><span
+                        class="text-[10px] ml-1">km/h</span>
                 </p>
             </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-orange-600 text-center">
@@ -133,6 +139,16 @@
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Déniv. (-)</p>
                 <p class="text-2xl font-black text-emerald-600">-<span id="elevNeg">0</span><span
                         class="text-[10px] ml-1">m</span></p>
+            </div>
+            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-cyan-500 text-center">
+                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Altitude</p>
+                <p class="text-2xl font-black text-cyan-600"><span id="altVal">-</span><span
+                        class="text-[10px] ml-1">m</span></p>
+            </div>
+            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-yellow-500 text-center">
+                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Énergie</p>
+                <p class="text-2xl font-black text-yellow-600"><span id="energyVal">0</span><span
+                        class="text-[10px] ml-1">kcal</span></p>
             </div>
         </div>
 
@@ -213,6 +229,7 @@
         let pathPoints = [], totalDistance = 0, elevPositive = 0, elevNegative = 0, lastAltitude = null;
         let activeSeconds = 0, timerInterval;
         let maxSpeed100m = 0;
+        let currentSpeed = 0;
         let positionsBuffer = [];
         let altitudeBuffer = [];
         let speedBuffer = [];
@@ -471,6 +488,8 @@
                         smoothedSpeed = speedBuffer.reduce((a, b) => a + b, 0) / speedBuffer.length;
                     }
 
+                    currentSpeed = smoothedSpeed;
+
                     const wasMoving = isMoving;
                     isMoving = smoothedSpeed >= MIN_SPEED_KMH;
 
@@ -535,8 +554,22 @@
                 document.getElementById('distVal').innerText = (totalDistance / 1000).toFixed(2);
                 document.getElementById('elevPos').innerText = Math.round(elevPositive);
                 document.getElementById('elevNeg').innerText = Math.round(elevNegative);
+
                 const avg = activeSeconds > 0 ? (totalDistance / 1000) / (activeSeconds / 3600) : 0;
                 document.getElementById('speedVal').innerText = avg.toFixed(2);
+
+                // Actualiser Altitude
+                document.getElementById('altVal').innerText = lastAltitude !== null ? Math.round(lastAltitude) : "-";
+
+                // Actualiser Vitesse Actuelle
+                let displayedCurrentSpeed = isMoving ? currentSpeed : 0;
+                document.getElementById('speedCurrentVal').innerText = displayedCurrentSpeed.toFixed(1);
+
+                // Calcul basique calories (MET approx)
+                const speedToMet = speed => speed < 16 ? 4 : speed < 20 ? 6 : speed < 25 ? 8 : speed < 30 ? 10 : 12;
+                const calories = activeSeconds > 0 ? speedToMet(avg) * 70 * (activeSeconds / 3600) : 0;
+                document.getElementById('energyVal').innerText = Math.round(calories);
+
             }, null, { enableHighAccuracy: true });
         }
 

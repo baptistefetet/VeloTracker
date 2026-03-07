@@ -104,7 +104,7 @@
         </header>
 
         <!-- Grille de Statistiques en temps réel -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-indigo-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Distance</p>
                 <p class="text-2xl font-black"><span id="distVal">0.00</span><span class="text-[10px] ml-1">km</span>
@@ -130,6 +130,10 @@
                 <p class="text-2xl font-black text-orange-600"><span id="speedMaxVal">0.0</span><span
                         class="text-[10px] ml-1">km/h</span></p>
             </div>
+            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-pink-500 text-center">
+                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Énergie (kcal)</p>
+                <p class="text-2xl font-black text-pink-600"><span id="energyVal">0</span></p>
+            </div>
             <div class="glass-card p-3 rounded-2xl border-b-4 border-b-rose-500 text-center">
                 <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Déniv. (+)</p>
                 <p class="text-2xl font-black text-rose-600">+<span id="elevPos">0</span><span
@@ -145,10 +149,10 @@
                 <p class="text-2xl font-black text-cyan-600"><span id="altVal">-</span><span
                         class="text-[10px] ml-1">m</span></p>
             </div>
-            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-yellow-500 text-center">
-                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Énergie</p>
-                <p class="text-2xl font-black text-yellow-600"><span id="energyVal">0</span><span
-                        class="text-[10px] ml-1">kcal</span></p>
+            <div class="glass-card p-3 rounded-2xl border-b-4 border-b-slate-500 text-center">
+                <p class="text-[9px] font-bold text-slate-400 uppercase mb-1">Rythme moyen</p>
+                <p class="text-2xl font-black text-slate-600"><span id="paceVal">0:00</span><span
+                        class="text-[10px] ml-1">/km</span></p>
             </div>
         </div>
 
@@ -565,10 +569,21 @@
                 let displayedCurrentSpeed = isMoving ? currentSpeed : 0;
                 document.getElementById('speedCurrentVal').innerText = displayedCurrentSpeed.toFixed(1);
 
-                // Calcul basique calories (MET approx)
+                // Calcul basique calories (MET approx pour 48kg)
                 const speedToMet = speed => speed < 16 ? 4 : speed < 20 ? 6 : speed < 25 ? 8 : speed < 30 ? 10 : 12;
-                const calories = activeSeconds > 0 ? speedToMet(avg) * 70 * (activeSeconds / 3600) : 0;
+                const weightKg = 48; // Poids utilisateur
+                const calories = activeSeconds > 0 ? speedToMet(avg) * weightKg * (activeSeconds / 3600) : 0;
                 document.getElementById('energyVal').innerText = Math.round(calories);
+
+                // Calcul Rythme Moyen (Pace en min/km)
+                let paceDisplay = "0:00";
+                if (avg > 0) {
+                    const paceMinutesDecimal = 60 / avg;
+                    const pMin = Math.floor(paceMinutesDecimal);
+                    const pSec = Math.round((paceMinutesDecimal - pMin) * 60);
+                    paceDisplay = `${pMin}:${pSec.toString().padStart(2, '0')}`;
+                }
+                document.getElementById('paceVal').innerText = paceDisplay;
 
             }, null, { enableHighAccuracy: true });
         }

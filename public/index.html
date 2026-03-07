@@ -85,22 +85,21 @@
     <div class="max-w-7xl mx-auto space-y-4">
         <!-- Barre de Statut Supérieure -->
         <header
-            class="flex justify-between items-center bg-[#4F46E5] p-3 rounded-2xl shadow-lg border border-indigo-400 sticky top-2 z-50">
+            class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100 sticky top-2 z-50">
             <div class="flex items-center gap-3">
-                <img src="/favicon.png" alt="VéloTracker"
-                    class="w-11 h-11 rounded-lg shadow-sm cursor-pointer border-2 border-white/20"
+                <img src="/favicon.png" alt="VéloTracker" class="w-11 h-11 rounded-lg shadow-sm cursor-pointer"
                     onclick="window.location.reload()">
                 <button id="trackBtn"
-                    class="bg-[#4F46E5] hover:bg-indigo-700 text-white border-2 border-white/30 px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2">
+                    class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2">
                     <div id="trackBtnDot" class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
                     <span id="trackBtnText">COMMENCER</span>
                 </button>
             </div>
             <div id="status-badge"
-                class="flex items-center gap-2 px-3 py-1 rounded-full border border-white/20 bg-white/10 backdrop-filter blur-sm transition-all">
-                <div id="status-dot" class="w-2 h-2 rounded-full bg-indigo-200"></div>
+                class="flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 transition-all">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></div>
                 <span id="status-text"
-                    class="text-[10px] font-black uppercase tracking-widest text-indigo-50">PRÊT</span>
+                    class="text-[10px] font-black uppercase tracking-widest text-slate-500">PRÊT</span>
             </div>
         </header>
 
@@ -609,10 +608,10 @@
             currentTripId = null;
 
             const btn = document.getElementById('trackBtn');
-            btn.className = 'bg-[#4F46E5] hover:bg-indigo-700 text-white border-2 border-white/30 px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2';
+            btn.className = 'bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2';
             document.getElementById('trackBtnDot').className = 'w-2 h-2 rounded-full bg-white animate-pulse';
             document.getElementById('trackBtnText').innerText = "COMMENCER";
-            document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-indigo-200";
+            document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-slate-400";
             document.getElementById('status-text').innerText = "PRÊT";
 
             await refreshUI();

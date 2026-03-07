@@ -85,21 +85,22 @@
     <div class="max-w-7xl mx-auto space-y-4">
         <!-- Barre de Statut Supérieure -->
         <header
-            class="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100 sticky top-2 z-50">
+            class="flex justify-between items-center bg-[#4F46E5] p-3 rounded-2xl shadow-lg border border-indigo-400 sticky top-2 z-50">
             <div class="flex items-center gap-3">
-                <img src="/favicon.png" alt="VéloTracker" class="w-11 h-11 rounded-lg shadow-sm cursor-pointer"
+                <img src="/favicon.png" alt="VéloTracker"
+                    class="w-11 h-11 rounded-lg shadow-sm cursor-pointer border-2 border-white/20"
                     onclick="window.location.reload()">
                 <button id="trackBtn"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2">
+                    class="bg-[#4F46E5] hover:bg-indigo-700 text-white border-2 border-white/30 px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2">
                     <div id="trackBtnDot" class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
                     <span id="trackBtnText">COMMENCER</span>
                 </button>
             </div>
             <div id="status-badge"
-                class="flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 transition-all">
-                <div id="status-dot" class="w-2 h-2 rounded-full bg-slate-400"></div>
+                class="flex items-center gap-2 px-3 py-1 rounded-full border border-white/20 bg-white/10 backdrop-filter blur-sm transition-all">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-indigo-200"></div>
                 <span id="status-text"
-                    class="text-[10px] font-black uppercase tracking-widest text-slate-500">PRÊT</span>
+                    class="text-[10px] font-black uppercase tracking-widest text-indigo-50">PRÊT</span>
             </div>
         </header>
 
@@ -608,10 +609,10 @@
             currentTripId = null;
 
             const btn = document.getElementById('trackBtn');
-            btn.className = 'bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2';
+            btn.className = 'bg-[#4F46E5] hover:bg-indigo-700 text-white border-2 border-white/30 px-4 py-2 rounded-full font-bold text-xs shadow-lg transition-all transform active:scale-95 flex items-center gap-2';
             document.getElementById('trackBtnDot').className = 'w-2 h-2 rounded-full bg-white animate-pulse';
             document.getElementById('trackBtnText').innerText = "COMMENCER";
-            document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-slate-400";
+            document.getElementById('status-dot').className = "w-2 h-2 rounded-full bg-indigo-200";
             document.getElementById('status-text').innerText = "PRÊT";
 
             await refreshUI();
@@ -633,24 +634,46 @@
                 const k = t.distance_km || 0;
                 const u = t.elev_positive || 0;
                 const d = t.elev_negative || 0;
-                const dur = formatDuration(t.duration_seconds || 0);
+                const durSec = t.duration_seconds || 0;
+                const dur = formatDuration(durSec);
+                const avgSpd = t.avg_speed_kmh || 0;
                 const maxSpd = t.max_speed_kmh || 0;
                 const dateStr = sDate.toLocaleDateString('fr-FR');
+
+                // Calculs locaux pour historique
+                const speedToMet = speed => speed < 16 ? 4 : speed < 20 ? 6 : speed < 25 ? 8 : speed < 30 ? 10 : 12;
+                const kcal = Math.round(speedToMet(avgSpd) * 48 * (durSec / 3600));
+
+                let paceStr = "0:00";
+                if (avgSpd > 0) {
+                    const paceMinDec = 60 / avgSpd;
+                    const pM = Math.floor(paceMinDec);
+                    const pS = Math.round((paceMinDec - pM) * 60);
+                    paceStr = `${pM}:${pS.toString().padStart(2, '0')}`;
+                }
 
                 if (sDate.toDateString() === now.toDateString()) { dayK += k; dayU += u; dayD += d; }
                 if (sDate.getMonth() === now.getMonth() && sDate.getFullYear() === now.getFullYear()) { monthK += k; monthU += u; monthD += d; }
                 if (sDate.getFullYear() === now.getFullYear()) { yearK += k; yearU += u; yearD += d; }
 
                 const div = document.createElement('div');
-                div.className = "bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center";
+                div.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3";
                 div.innerHTML = `
-                    <div class="text-[10px]">
-                        <p class="font-black text-slate-900">${dateStr}</p>
-                        <p class="text-slate-400">${dur} • Max ${maxSpd.toFixed(2)} km/h</p>
+                    <div class="flex justify-between items-center border-b border-slate-50 pb-2">
+                        <p class="font-black text-black text-xs">${dateStr}</p>
+                        <p class="font-black text-black text-xs uppercase tracking-tighter">${k.toFixed(2)} KM</p>
                     </div>
-                    <div class="text-right">
-                        <p class="text-indigo-600 font-black">${k.toFixed(2)} km</p>
-                        <p class="text-[9px] text-slate-400 font-bold">▲${u}m ▼${d}m</p>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] text-black">
+                        <div class="flex justify-between"><span>Durée:</span><span class="font-bold">${dur}</span></div>
+                        <div class="flex justify-between"><span>Vit. moy:</span><span class="font-bold">${avgSpd.toFixed(1)} km/h</span></div>
+                        <div class="flex justify-between"><span>Vit. max:</span><span class="font-bold">${maxSpd.toFixed(1)} km/h</span></div>
+                        <div class="flex justify-between"><span>Vit. actuelle:</span><span class="font-bold">-</span></div>
+                        <div class="flex justify-between"><span>Énergie (kcal):</span><span class="font-bold">${kcal} kcal</span></div>
+                        <div class="flex justify-between"><span>Déniv. (+):</span><span class="font-bold">+${u}m</span></div>
+                        <div class="flex justify-between"><span>Déniv. (-):</span><span class="font-bold">-${d}m</span></div>
+                        <div class="flex justify-between"><span>Altitude:</span><span class="font-bold">-</span></div>
+                        <div class="flex justify-between"><span>Rythme moyen:</span><span class="font-bold">${paceStr}/km</span></div>
+                        <div class="flex justify-between"><span>Distance:</span><span class="font-bold">${k.toFixed(2)} km</span></div>
                     </div>`;
                 list.appendChild(div);
             });

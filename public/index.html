@@ -188,35 +188,26 @@
                     </div>
 
                     <div id="reports-content" class="hidden space-y-4">
-                        <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-                            <p class="text-[10px] font-black text-slate-400 uppercase mb-3">Aujourd'hui</p>
-                            <div class="flex justify-between items-end">
-                                <span class="text-2xl font-black text-slate-800" id="stats-day">0.0 km</span>
-                                <div class="text-right text-[10px] font-bold">
-                                    <p class="text-rose-600" id="stats-day-pos">+0m</p>
-                                    <p class="text-emerald-600" id="stats-day-neg">-0m</p>
-                                </div>
+                        <!-- Aujourd'hui -->
+                        <div class="bg-emerald-50 p-4 rounded-3xl border border-emerald-100 shadow-sm space-y-3">
+                            <p class="text-[11px] font-black text-emerald-800 uppercase tracking-widest">Aujourd'hui</p>
+                            <div id="report-day-grid" class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] text-black">
+                                <!-- JS injecte ici -->
                             </div>
                         </div>
-                        <div class="bg-indigo-600 p-4 rounded-2xl shadow-lg shadow-indigo-200">
-                            <p class="text-[10px] font-black text-indigo-200 uppercase mb-3">Ce Mois-ci</p>
-                            <div class="flex justify-between items-end">
-                                <span class="text-2xl font-black text-white" id="stats-month">0.0 km</span>
-                                <div class="text-right text-[10px] font-bold">
-                                    <p class="text-indigo-200" id="stats-month-pos">+0m</p>
-                                    <p class="text-indigo-300" id="stats-month-neg">-0m</p>
-                                </div>
+                        <!-- Ce Mois-ci -->
+                        <div class="bg-blue-50 p-4 rounded-3xl border border-blue-100 shadow-sm space-y-3">
+                            <p class="text-[11px] font-black text-blue-800 uppercase tracking-widest">Ce Mois-ci</p>
+                            <div id="report-month-grid" class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] text-black">
+                                <!-- JS injecte ici -->
                             </div>
                         </div>
-                        <div class="bg-slate-900 p-4 rounded-2xl">
-                            <p class="text-[10px] font-black text-slate-500 uppercase mb-3">Année <span
+                        <!-- Année -->
+                        <div class="bg-blue-200 p-4 rounded-3xl border border-blue-300 shadow-sm space-y-3">
+                            <p class="text-[11px] font-black text-blue-900 uppercase tracking-widest">Année <span
                                     id="year-label">2024</span></p>
-                            <div class="flex justify-between items-end">
-                                <span class="text-2xl font-black text-white" id="stats-year">0.0 km</span>
-                                <div class="text-right text-[10px] font-bold">
-                                    <p class="text-rose-400" id="stats-year-pos">+0m</p>
-                                    <p class="text-emerald-400" id="stats-year-neg">-0m</p>
-                                </div>
+                            <div id="report-year-grid" class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] text-black">
+                                <!-- JS injecte ici -->
                             </div>
                         </div>
                     </div>
@@ -624,9 +615,11 @@
             list.innerHTML = trips.length ? '' : '<p class="text-center text-slate-400 text-xs py-10 italic">Aucune balade enregistrée</p>';
 
             const now = new Date();
-            let dayK = 0, dayU = 0, dayD = 0;
-            let monthK = 0, monthU = 0, monthD = 0;
-            let yearK = 0, yearU = 0, yearD = 0;
+            // Aggregates for reports
+            const createStatsObj = () => ({ distance: 0, duration: 0, elevPos: 0, elevNeg: 0, kcal: 0, maxSpeed: 0 });
+            const dayStats = createStatsObj();
+            const monthStats = createStatsObj();
+            const yearStats = createStatsObj();
 
             trips.forEach(t => {
                 const sDate = new Date(t.started_at);
@@ -651,9 +644,18 @@
                     paceStr = `${pM}:${pS.toString().padStart(2, '0')}`;
                 }
 
-                if (sDate.toDateString() === now.toDateString()) { dayK += k; dayU += u; dayD += d; }
-                if (sDate.getMonth() === now.getMonth() && sDate.getFullYear() === now.getFullYear()) { monthK += k; monthU += u; monthD += d; }
-                if (sDate.getFullYear() === now.getFullYear()) { yearK += k; yearU += u; yearD += d; }
+                const processStats = (obj) => {
+                    obj.distance += k;
+                    obj.duration += durSec;
+                    obj.elevPos += u;
+                    obj.elevNeg += d;
+                    obj.kcal += kcal;
+                    if (maxSpd > obj.maxSpeed) obj.maxSpeed = maxSpd;
+                };
+
+                if (sDate.toDateString() === now.toDateString()) processStats(dayStats);
+                if (sDate.getMonth() === now.getMonth() && sDate.getFullYear() === now.getFullYear()) processStats(monthStats);
+                if (sDate.getFullYear() === now.getFullYear()) processStats(yearStats);
 
                 const div = document.createElement('div');
                 div.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3";
@@ -677,15 +679,34 @@
                 list.appendChild(div);
             });
 
-            document.getElementById('stats-day').innerText = dayK.toFixed(2) + " km";
-            document.getElementById('stats-day-pos').innerText = "+" + dayU + "m";
-            document.getElementById('stats-day-neg').innerText = "-" + dayD + "m";
-            document.getElementById('stats-month').innerText = monthK.toFixed(2) + " km";
-            document.getElementById('stats-month-pos').innerText = "+" + monthU + "m";
-            document.getElementById('stats-month-neg').innerText = "-" + monthD + "m";
-            document.getElementById('stats-year').innerText = yearK.toFixed(2) + " km";
-            document.getElementById('stats-year-pos').innerText = "+" + yearU + "m";
-            document.getElementById('stats-year-neg').innerText = "-" + yearD + "m";
+            const renderReportGrid = (containerId, stats) => {
+                const grid = document.getElementById(containerId);
+                const avgSpd = stats.duration > 0 ? stats.distance / (stats.duration / 3600) : 0;
+                let paceStr = "0:00";
+                if (avgSpd > 0) {
+                    const paceMinDec = 60 / avgSpd;
+                    const pM = Math.floor(paceMinDec);
+                    const pS = Math.round((paceMinDec - pM) * 60);
+                    paceStr = `${pM}:${pS.toString().padStart(2, '0')}`;
+                }
+
+                grid.innerHTML = `
+                    <div class="flex justify-between"><span>Distance:</span><span class="font-bold">${stats.distance.toFixed(2)} km</span></div>
+                    <div class="flex justify-between"><span>Durée:</span><span class="font-bold">${formatDuration(stats.duration)}</span></div>
+                    <div class="flex justify-between"><span>Vit. actuelle:</span><span class="font-bold">-</span></div>
+                    <div class="flex justify-between"><span>Vit. moy:</span><span class="font-bold">${avgSpd.toFixed(1)} km/h</span></div>
+                    <div class="flex justify-between"><span>Vit. max:</span><span class="font-bold">${stats.maxSpeed.toFixed(1)} km/h</span></div>
+                    <div class="flex justify-between"><span>Énergie (kcal):</span><span class="font-bold">${stats.kcal} kcal</span></div>
+                    <div class="flex justify-between"><span>Déniv. (+):</span><span class="font-bold">+${stats.elevPos}m</span></div>
+                    <div class="flex justify-between"><span>Déniv. (-):</span><span class="font-bold">-${stats.elevNeg}m</span></div>
+                    <div class="flex justify-between"><span>Altitude:</span><span class="font-bold">-</span></div>
+                    <div class="flex justify-between"><span>Rythme moyen:</span><span class="font-bold">${paceStr}/km</span></div>
+                `;
+            };
+
+            renderReportGrid('report-day-grid', dayStats);
+            renderReportGrid('report-month-grid', monthStats);
+            renderReportGrid('report-year-grid', yearStats);
             document.getElementById('year-label').innerText = now.getFullYear();
         }
 
